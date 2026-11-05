@@ -1,0 +1,43 @@
+name: Visual review (isolated runner)
+
+on:
+  push:
+    branches:
+      - feat/visual-qa-off-vps
+  pull_request:
+    paths:
+      - index.html
+      - tests/visual-check.mjs
+      - .github/workflows/visual-review.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: visual-review-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  screenshots:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install Chromium in disposable GitHub runner
+        run: |
+          npm install --no-save --package-lock=false playwright@1.58.2
+          npx playwright install --with-deps chromium
+      - name: Capture and audit desktop and mobile
+        run: node tests/visual-check.mjs
+      - name: Upload visual evidence, even if checks fail
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: visual-evidence-${{ github.run_id }}
+          path: output/visual/
+          retention-days: 7
+          if-no-files-found: warn
